@@ -1,0 +1,74 @@
+﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using BalzorApp.Services
+
+<PageTitle>BalzorApp</PageTitle>
+
+<div class="d-flex">
+    <div class="d-flex flex-column flex-shrink-0 p-3 bg-dark text-white" style="width: 220px; min-height: 100vh;">
+        <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+            <span class="fs-4">BalzorApp</span>
+        </a>
+        <hr>
+        <ul class="nav nav-pills flex-column mb-auto">
+            <li class="nav-item">
+                <NavLink class="nav-link text-white" href="" Match="NavLinkMatch.All">
+                    <span class="oi oi-home me-2"></span> Home
+                </NavLink>
+            </li>
+            <li>
+                <NavLink class="nav-link text-white" href="counter">
+                    <span class="oi oi-plus me-2"></span> Counter
+                </NavLink>
+            </li>
+            <li>
+                <NavLink class="nav-link text-white" href="weather">
+                    <span class="oi oi-list-rich me-2"></span> Weather
+                </NavLink>
+            </li>
+            <AuthorizeView>
+                <Authorized>
+                    <li>
+                        <NavLink class="nav-link text-white" href="manage-users">
+                            <span class="oi oi-people me-2"></span> Manage Users
+                        </NavLink>
+                    </li>
+                </Authorized>
+            </AuthorizeView>
+        </ul>
+    </div>
+
+    <main class="flex-grow-1">
+        <div class="top-row px-4">
+            <AuthorizeView>
+                <Authorized>
+                    <span>Hello, @context.User.Identity?.Name!</span>
+                    <button class="btn btn-outline-primary" @onclick="Logout">Logout</button>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="login" class="btn btn-primary">Login</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+
+        <CascadingAuthenticationState>
+            <article class="content px-4">
+                @Body
+            </article>
+        </CascadingAuthenticationState>
+    </main>
+</div>
+
+@code {
+    [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private void Logout()
+    {
+        if (AuthStateProvider is BalzorApp.Services.CustomAuthenticationStateProvider customProvider)
+        {
+            customProvider.Logout();
+        }
+        Navigation.NavigateTo("/");
+    }
+}

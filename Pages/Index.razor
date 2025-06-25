@@ -1,0 +1,89 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Web
+@attribute [Authorize]
+
+<PageTitle>Home</PageTitle>
+
+<div class="container">
+    <h1>Welcome to BalzorApp</h1>
+    <p class="lead">A modern Blazor Server application with authentication</p>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Getting Started</h5>
+                </div>
+                <div class="card-body">
+                    <p>Welcome to your new Blazor Server application!</p>
+                    <div class="d-flex gap-2">
+                        <span class="badge bg-success">Ready</span>
+                        <span class="badge bg-info">Blazor</span>
+                        <span class="badge bg-primary">.NET 8</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Navigation</h5>
+                </div>
+                <div class="card-body">
+                    <a href="/counter" class="btn btn-primary">Go to Counter</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Weather</h5>
+                </div>
+                <div class="card-body">
+                    <a href="/weather" class="btn btn-primary">View Weather</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Account</h5>
+                </div>
+                <div class="card-body">
+                    <a href="/login" class="btn btn-secondary">Login</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Features</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center">
+                            <i class="oi oi-shield" style="font-size: 2rem;"></i>
+                            <p class="mt-2">Authentication</p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="oi oi-palette" style="font-size: 2rem;"></i>
+                            <p class="mt-2">Modern UI</p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="oi oi-monitor" style="font-size: 2rem;"></i>
+                            <p class="mt-2">Responsive</p>
+                        </div>
+                        <div class="col-md-3 text-center">
+                            <i class="oi oi-rocket" style="font-size: 2rem;"></i>
+                            <p class="mt-2">Fast</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

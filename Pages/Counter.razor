@@ -1,0 +1,58 @@
+﻿@page "/counter"
+@using Microsoft.AspNetCore.Components.Web
+
+<PageTitle>Counter</PageTitle>
+
+<div class="container">
+    <h1>Counter</h1>
+    <p class="lead">Current count: @currentCount</p>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Counter Example</h5>
+                </div>
+                <div class="card-body">
+                    <p>Current count: @currentCount</p>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" @onclick="IncrementCount">
+                            Click me
+                        </button>
+                        <button class="btn btn-secondary" @onclick="ResetCount">
+                            Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title">Counter Stats</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <span class="me-2">Count:</span>
+                        <span class="badge bg-primary">@currentCount</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int currentCount = 0;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+
+    private void ResetCount()
+    {
+        currentCount = 0;
+    }
+}

@@ -1,0 +1,113 @@
+@page "/weather"
+@using Microsoft.AspNetCore.Components.Web
+@using BalzorApp.Data
+@inject WeatherForecastService ForecastService
+
+<PageTitle>Weather</PageTitle>
+
+<div class="container">
+    <h1>Weather Forecast</h1>
+    <p class="lead">This component demonstrates fetching data from a service.</p>
+
+    @if (forecasts == null)
+    {
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Loading weather data...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Weather Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Showing @forecasts.Length days of weather forecast.</p>
+                        <div class="mt-3">
+                            <span class="badge bg-@GetWeatherColor(forecasts.FirstOrDefault()?.Summary ?? "")">
+                                @forecasts.FirstOrDefault()?.Summary
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Detailed Forecast</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Temp. (C)</th>
+                                        <th>Temp. (F)</th>
+                                        <th>Summary</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var forecast in forecasts)
+                                    {
+                                        <tr>
+                                            <td>@forecast.Date.ToShortDateString()</td>
+                                            <td>@forecast.TemperatureC</td>
+                                            <td>@forecast.TemperatureF</td>
+                                            <td>
+                                                <span class="badge bg-@GetWeatherColor(forecast.Summary)">
+                                                    @forecast.Summary
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private WeatherForecast[]? forecasts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        forecasts = await ForecastService.GetForecastAsync(DateOnly.FromDateTime(DateTime.Now));
+    }
+
+    private string GetWeatherColor(string summary)
+    {
+        return summary.ToLower() switch
+        {
+            "freezing" or "bracing" => "info",
+            "chilly" => "primary",
+            "cool" => "secondary",
+            "mild" => "success",
+            "warm" => "warning",
+            "balmy" => "warning",
+            "hot" => "danger",
+            "sweltering" or "scorching" => "dark",
+            _ => "secondary"
+        };
+    }
+} 

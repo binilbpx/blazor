@@ -1,0 +1,246 @@
+@page "/manage-users"
+@using BalzorApp.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IUserService UserService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Manage Users</PageTitle>
+
+<AuthorizeView Roles="Admin" Context="authContext">
+    <Authorized>
+        <h2>Manage Users</h2>
+
+        @if (!string.IsNullOrEmpty(feedbackMessage))
+        {
+            <div class="alert @feedbackClass" role="alert">@feedbackMessage</div>
+        }
+
+        @if (!isLoaded)
+        {
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        }
+        else
+        {
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card border-primary shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="mb-0">@(editMode ? "Edit User" : "Add User")</h4>
+                        </div>
+                        <div class="card-body">
+                            <EditForm Model="userModel" OnValidSubmit="HandleValidSubmit" Context="formContext">
+                                <DataAnnotationsValidator />
+                                <ValidationSummary />
+                                <div class="mb-3">
+                                    <label class="form-label">Username</label>
+                                    <InputText class="form-control" @bind-Value="userModel.Username" disabled="@editMode" />
+                                    <ValidationMessage For="@(() => userModel.Username)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Password</label>
+                                    <InputText class="form-control" @bind-Value="userModel.Password" type="password" autocomplete="new-password" />
+                                    <ValidationMessage For="@(() => userModel.Password)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Confirm Password</label>
+                                    <InputText class="form-control" @bind-Value="userModel.ConfirmPassword" type="password" autocomplete="new-password" />
+                                    <ValidationMessage For="@(() => userModel.ConfirmPassword)" />
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Role</label>
+                                    <InputSelect class="form-control" @bind-Value="userModel.Role">
+                                        <option value="">Select a role</option>
+                                        <option value="Admin">Admin</option>
+                                        <option value="User">User</option>
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => userModel.Role)" />
+                                </div>
+                                <button type="submit" class="btn btn-primary me-2">@(editMode ? "Update" : "Add")</button>
+                                @if (editMode)
+                                {
+                                    <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
+                                }
+                            </EditForm>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card border-secondary shadow-sm mb-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h4 class="mb-0">User List</h4>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Role</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var user in users)
+                                    {
+                                        <tr>
+                                            <td>@user.Username</td>
+                                            <td>@user.Role</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-warning me-2" @onclick="() => EditUser(user)" disabled="@(user.Username == currentUsername)">Edit</button>
+                                                <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteUser(user.Username)" disabled="@(user.Username == currentUsername)">Delete</button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (showDeleteConfirm)
+        {
+            <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5);">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Confirm Delete</h5>
+                        </div>
+                        <div class="modal-body">
+                            <p>Are you sure you want to delete user <strong>@userToDelete</strong>?</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-danger" @onclick="DeleteUserConfirmed">Delete</button>
+                            <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <div class="alert alert-danger mt-4">You do not have permission to view this page.</div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<User> users = new();
+    private UserModel userModel = new();
+    private bool editMode = false;
+    private bool isLoaded = false;
+    private string? currentUsername;
+    private string? feedbackMessage;
+    private string feedbackClass = "alert-success";
+    private bool showDeleteConfirm = false;
+    private string? userToDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUsername = authState.User.Identity?.Name;
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        users = (await UserService.GetAllUsersAsync()).ToList();
+        isLoaded = true;
+        StateHasChanged();
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        feedbackMessage = null;
+        if (!editMode && users.Any(u => u.Username == userModel.Username))
+        {
+            feedbackMessage = "Username already exists.";
+            feedbackClass = "alert-danger";
+            return;
+        }
+        if (userModel.Password != userModel.ConfirmPassword)
+        {
+            feedbackMessage = "Passwords do not match.";
+            feedbackClass = "alert-danger";
+            return;
+        }
+        if (editMode)
+        {
+            await UserService.UpdateUserAsync(userModel.Username, userModel.Password, userModel.Role);
+            feedbackMessage = "User updated successfully.";
+            feedbackClass = "alert-success";
+        }
+        else
+        {
+            await UserService.CreateUserAsync(userModel.Username, userModel.Password, userModel.Role);
+            feedbackMessage = "User created successfully.";
+            feedbackClass = "alert-success";
+        }
+        await LoadUsers();
+        userModel = new();
+        editMode = false;
+    }
+
+    private void EditUser(User user)
+    {
+        userModel = new UserModel
+        {
+            Username = user.Username,
+            Password = string.Empty, // Do not pre-fill password
+            ConfirmPassword = string.Empty,
+            Role = user.Role
+        };
+        editMode = true;
+        feedbackMessage = null;
+    }
+
+    private void ConfirmDeleteUser(string username)
+    {
+        userToDelete = username;
+        showDeleteConfirm = true;
+    }
+
+    private async Task DeleteUserConfirmed()
+    {
+        if (!string.IsNullOrEmpty(userToDelete))
+        {
+            await UserService.DeleteUserAsync(userToDelete);
+            feedbackMessage = "User deleted successfully.";
+            feedbackClass = "alert-success";
+            await LoadUsers();
+        }
+        showDeleteConfirm = false;
+        userToDelete = null;
+    }
+
+    private void CancelEdit()
+    {
+        userModel = new();
+        editMode = false;
+        feedbackMessage = null;
+    }
+
+    public class UserModel : IValidatableObject
+    {
+        [Required]
+        [MinLength(3)]
+        public string Username { get; set; } = string.Empty;
+        [Required]
+        [MinLength(3)]
+        public string Password { get; set; } = string.Empty;
+        [Required]
+        [MinLength(3)]
+        public string ConfirmPassword { get; set; } = string.Empty;
+        [Required]
+        public string Role { get; set; } = string.Empty;
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (Password != ConfirmPassword)
+            {
+                yield return new ValidationResult("Passwords do not match.", new[] { nameof(ConfirmPassword) });
+            }
+        }
+    }
+} 
