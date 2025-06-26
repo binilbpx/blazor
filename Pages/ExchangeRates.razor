@@ -1,0 +1,484 @@
+@page "/exchange-rates"
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Text.Json
+@using Blazored.Typeahead
+@inject HttpClient Http
+@inject ILogger<ExchangeRates> Logger
+
+<PageTitle>Exchange Rates - BalzorApp</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="container-fluid">
+            <div class="row mb-4">
+                <div class="col">
+                    <h1 class="h3 mb-0 text-dark">
+                        <span class="oi oi-globe me-2"></span>Exchange Rates
+                    </h1>
+                    <p class="text-muted">Real-time currency conversion rates from around the world</p>
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-3">Loading exchange rates...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (errorMessage != null)
+            {
+                <div class="row">
+                    <div class="col-12">
+                        <div class="alert alert-danger" role="alert">
+                            <span class="oi oi-warning me-2"></span>
+                            @errorMessage
+                            <button class="btn btn-sm btn-outline-danger ms-3" @onclick="LoadExchangeRates">
+                                <span class="oi oi-reload me-1"></span>Retry
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (exchangeData != null)
+            {
+                <!-- Currency Converter -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <span class="oi oi-calculator me-2"></span>Currency Converter
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label class="form-label">From Currency</label>
+                                        <BlazoredTypeahead
+                                            TItem="string"
+                                            TValue="string"
+                                            @bind-Value="fromCurrency"
+                                            SearchMethod="SearchCurrencies"
+                                            Placeholder="Search currency..."
+                                            Debounce="200"
+                                            MinLength="1">
+                                            <ResultTemplate Context="currency">
+                                                <div class="d-flex align-items-center">
+                                                    <span class="me-2" style="font-size: 1.2rem;">@GetCurrencyFlag(currency)</span>
+                                                    <span>@currency</span>
+                                                </div>
+                                            </ResultTemplate>
+                                            <SelectedTemplate Context="currency">
+                                                <div class="d-flex align-items-center">
+                                                    <span class="me-2" style="font-size: 1.2rem;">@GetCurrencyFlag(currency)</span>
+                                                    <span>@currency</span>
+                                                </div>
+                                            </SelectedTemplate>
+                                        </BlazoredTypeahead>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Amount</label>
+                                        <input type="number" class="form-control" @bind="amount" @bind:event="oninput" @bind:after="CalculateConversion" placeholder="Enter amount" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">To Currency</label>
+                                        <BlazoredTypeahead
+                                            TItem="string"
+                                            TValue="string"
+                                            @bind-Value="toCurrency"
+                                            SearchMethod="SearchCurrencies"
+                                            Placeholder="Search currency..."
+                                            Debounce="200"
+                                            MinLength="1">
+                                            <ResultTemplate Context="currency">
+                                                <div class="d-flex align-items-center">
+                                                    <span class="me-2" style="font-size: 1.2rem;">@GetCurrencyFlag(currency)</span>
+                                                    <span>@currency</span>
+                                                </div>
+                                            </ResultTemplate>
+                                            <SelectedTemplate Context="currency">
+                                                <div class="d-flex align-items-center">
+                                                    <span class="me-2" style="font-size: 1.2rem;">@GetCurrencyFlag(currency)</span>
+                                                    <span>@currency</span>
+                                                </div>
+                                            </SelectedTemplate>
+                                        </BlazoredTypeahead>
+                                    </div>
+                                </div>
+                                @if (convertedAmount > 0)
+                                {
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <div class="alert alert-success">
+                                                <strong>@amount @fromCurrency = @convertedAmount.ToString("F2") @toCurrency</strong>
+                                                <br />
+                                                <small class="text-muted">Rate: 1 @fromCurrency = @(exchangeData.rates.ContainsKey(toCurrency) ? exchangeData.rates[toCurrency].ToString("F4") : "N/A") @toCurrency</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exchange Rates Grid -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <span class="oi oi-list me-2"></span>All Exchange Rates (Base: @exchangeData.base_code)
+                                </h5>
+                                <div>
+                                    <small>Last Updated: @exchangeData.time_last_update_utc</small>
+                                    <button class="btn btn-sm btn-outline-light ms-3" @onclick="LoadExchangeRates">
+                                        <span class="oi oi-reload me-1"></span>Refresh
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    @foreach (var rate in DisplayRates)
+                                    {
+                                        <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
+                                            <div class="card h-100 border-0 shadow-sm currency-card">
+                                                <div class="card-body text-center">
+                                                    <div class="currency-flag mb-2">
+                                                        <span style="font-size: 2.5rem;">@GetCurrencyFlag(rate.Key)</span>
+                                                    </div>
+                                                    <h6 class="card-title mb-1">@rate.Key</h6>
+                                                    <p class="card-text h5 text-primary mb-2">@rate.Value.ToString("F4")</p>
+                                                    <small class="text-muted">1 @exchangeData.base_code = @rate.Value.ToString("F4") @rate.Key</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+
+                                @if (exchangeData.rates.Count > 20)
+                                {
+                                    <div class="text-center mt-4">
+                                        <button class="btn btn-outline-primary" @onclick="ShowAllRates">
+                                            @if (showAllCurrencies)
+                                            {
+                                                <span class="oi oi-collapse-up me-2"></span>
+                                                <span>Show First 20 Currencies</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="oi oi-expand-down me-2"></span>
+                                                <span>Show All @exchangeData.rates.Count Currencies</span>
+                                            }
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Popular Currencies -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">
+                                    <span class="oi oi-star me-2"></span>Popular Currencies
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    @{
+                                        var popularCurrencies = new[] { "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY" };
+                                    }
+                                    @foreach (var currency in popularCurrencies)
+                                    {
+                                        if (exchangeData.rates.ContainsKey(currency))
+                                        {
+                                            <div class="col-md-3 col-sm-6 mb-3">
+                                                <div class="d-flex align-items-center p-3 bg-light rounded">
+                                                    <div class="flex-shrink-0">
+                                                        <span style="font-size: 1.5rem;">@GetCurrencyFlag(currency)</span>
+                                                    </div>
+                                                    <div class="flex-grow-1 ms-3">
+                                                        <h6 class="mb-0">@currency</h6>
+                                                        <p class="mb-0 text-primary">@exchangeData.rates[currency].ToString("F4")</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="alert alert-warning" role="alert">
+            <span class="oi oi-warning me-2"></span>
+            Please log in to access the exchange rates.
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private ExchangeRateData? exchangeData;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string fromCurrency = "USD";
+    private string toCurrency = "EUR";
+    private decimal amount = 1;
+    private decimal convertedAmount = 0;
+    private List<string> availableCurrencies = new();
+    private string fromCurrencySearch = string.Empty;
+    private string toCurrencySearch = string.Empty;
+    private bool showFromDropdown = false;
+    private bool showToDropdown = false;
+    private bool showAllCurrencies = false;
+
+    private IEnumerable<string> FilteredFromCurrencies =>
+        string.IsNullOrWhiteSpace(fromCurrencySearch)
+            ? availableCurrencies
+            : availableCurrencies.Where(c => c.Contains(fromCurrencySearch, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<string> FilteredToCurrencies =>
+        string.IsNullOrWhiteSpace(toCurrencySearch)
+            ? availableCurrencies
+            : availableCurrencies.Where(c => c.Contains(toCurrencySearch, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<KeyValuePair<string, decimal>> DisplayRates =>
+        showAllCurrencies 
+            ? exchangeData?.rates ?? new Dictionary<string, decimal>()
+            : exchangeData?.rates.Take(20) ?? new Dictionary<string, decimal>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadExchangeRates();
+    }
+
+    private async Task LoadExchangeRates()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            // Using the free API endpoint (no API key required for basic usage)
+            var response = await Http.GetAsync("https://open.er-api.com/v6/latest/USD");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonString = await response.Content.ReadAsStringAsync();
+                exchangeData = JsonSerializer.Deserialize<ExchangeRateData>(jsonString);
+                
+                if (exchangeData?.rates != null)
+                {
+                    availableCurrencies = exchangeData.rates.Keys.ToList();
+                    availableCurrencies.Insert(0, exchangeData.base_code);
+                    CalculateConversion();
+                }
+            }
+            else
+            {
+                errorMessage = $"Failed to load exchange rates. Status: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading exchange rates");
+            errorMessage = "An error occurred while loading exchange rates. Please try again later.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void CalculateConversion()
+    {
+        if (exchangeData?.rates == null || amount <= 0) return;
+
+        try
+        {
+            if (fromCurrency == toCurrency)
+            {
+                convertedAmount = amount;
+                return;
+            }
+
+            // Convert to base currency first, then to target currency
+            decimal fromRate = fromCurrency == exchangeData.base_code ? 1 : exchangeData.rates[fromCurrency];
+            decimal toRate = toCurrency == exchangeData.base_code ? 1 : exchangeData.rates[toCurrency];
+
+            convertedAmount = amount * (toRate / fromRate);
+        }
+        catch
+        {
+            convertedAmount = 0;
+        }
+    }
+
+    private void ShowAllRates()
+    {
+        showAllCurrencies = !showAllCurrencies;
+    }
+
+    private Task<IEnumerable<string>> SearchCurrencies(string searchText)
+    {
+        return Task.FromResult(
+            availableCurrencies
+                .Where(c => c.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                .AsEnumerable()
+        );
+    }
+
+    private string GetCurrencyFlag(string currencyCode)
+    {
+        return currencyCode switch
+        {
+            "USD" => "🇺🇸",
+            "EUR" => "🇪🇺",
+            "GBP" => "🇬🇧",
+            "JPY" => "🇯🇵",
+            "CAD" => "🇨🇦",
+            "AUD" => "🇦🇺",
+            "CHF" => "🇨🇭",
+            "CNY" => "🇨🇳",
+            "INR" => "🇮🇳",
+            "BRL" => "🇧🇷",
+            "RUB" => "🇷🇺",
+            "KRW" => "🇰🇷",
+            "MXN" => "🇲🇽",
+            "SGD" => "🇸🇬",
+            "HKD" => "🇭🇰",
+            "NZD" => "🇳🇿",
+            "SEK" => "🇸🇪",
+            "NOK" => "🇳🇴",
+            "DKK" => "🇩🇰",
+            "PLN" => "🇵🇱",
+            "CZK" => "🇨🇿",
+            "HUF" => "🇭🇺",
+            "ILS" => "🇮🇱",
+            "CLP" => "🇨🇱",
+            "PHP" => "🇵🇭",
+            "ZAR" => "🇿🇦",
+            "THB" => "🇹🇭",
+            "MYR" => "🇲🇾",
+            "IDR" => "🇮🇩",
+            "TRY" => "🇹🇷",
+            "ARS" => "🇦🇷",
+            "COP" => "🇨🇴",
+            "PEN" => "🇵🇪",
+            "VND" => "🇻🇳",
+            "UAH" => "🇺🇦",
+            "RON" => "🇷🇴",
+            "BGN" => "🇧🇬",
+            "HRK" => "🇭🇷",
+            "RSD" => "🇷🇸",
+            "ISK" => "🇮🇸",
+            "UYU" => "🇺🇾",
+            "BOB" => "🇧🇴",
+            "PYG" => "🇵🇾",
+            "GTQ" => "🇬🇹",
+            "HNL" => "🇭🇳",
+            "NIO" => "🇳🇮",
+            "CRC" => "🇨🇷",
+            "PAB" => "🇵🇦",
+            "DOP" => "🇩🇴",
+            "JMD" => "🇯🇲",
+            "TTD" => "🇹🇹",
+            "BBD" => "🇧🇧",
+            "BZD" => "🇧🇿",
+            "XCD" => "🇦🇬", // Eastern Caribbean Dollar (using Antigua flag)
+            "ANG" => "🇦🇼", // Netherlands Antillean Guilder (using Aruba flag)
+            "AWG" => "🇦🇼",
+            "BMD" => "🇧🇲",
+            "KYD" => "🇰🇾",
+            "FJD" => "🇫🇯",
+            "PGK" => "🇵🇬",
+            "SBD" => "🇸🇧",
+            "VUV" => "🇻🇺",
+            "WST" => "🇼🇸",
+            "TOP" => "🇹🇴",
+            "TWD" => "🇹🇼",
+            "MOP" => "🇲🇴",
+            "BND" => "🇧🇳",
+            "LAK" => "🇱🇦",
+            "KHR" => "🇰🇭",
+            "MMK" => "🇲🇲",
+            "BDT" => "🇧🇩",
+            "LKR" => "🇱🇰",
+            "NPR" => "🇳🇵",
+            "PKR" => "🇵🇰",
+            "AFN" => "🇦🇫",
+            "IRR" => "🇮🇷",
+            "IQD" => "🇮🇶",
+            "KWD" => "🇰🇼",
+            "SAR" => "🇸🇦",
+            "AED" => "🇦🇪",
+            "QAR" => "🇶🇦",
+            "OMR" => "🇴🇲",
+            "BHD" => "🇧🇭",
+            "JOD" => "🇯🇴",
+            "LBP" => "🇱🇧",
+            "SYP" => "🇸🇾",
+            "EGP" => "🇪🇬",
+            "LYD" => "🇱🇾",
+            "TND" => "🇹🇳",
+            "DZD" => "🇩🇿",
+            "MAD" => "🇲🇦",
+            "MUR" => "🇲🇺",
+            "ZMW" => "🇿🇲",
+            "KES" => "🇰🇪",
+            "UGX" => "🇺🇬",
+            "TZS" => "🇹🇿",
+            "ETB" => "🇪🇹",
+            "NGN" => "🇳🇬",
+            "GHS" => "🇬🇭",
+            "XOF" => "🇨🇮", // West African CFA (using Ivory Coast flag)
+            "XAF" => "🇨🇲", // Central African CFA (using Cameroon flag)
+            "XPF" => "🇵🇫", // CFP Franc (using French Polynesia flag)
+            "ALL" => "🇦🇱",
+            "MKD" => "🇲🇰",
+            "MDL" => "🇲🇩",
+            "GEL" => "🇬🇪",
+            "AMD" => "🇦🇲",
+            "AZN" => "🇦🇿",
+            "BYN" => "🇧🇾",
+            "KZT" => "🇰🇿",
+            "KGS" => "🇰🇬",
+            "TJS" => "🇹🇯",
+            "TMT" => "🇹🇲",
+            "UZS" => "🇺🇿",
+            "MNT" => "🇲🇳",
+            _ => "🌐" // Default globe for unknown currencies
+        };
+    }
+
+    public class ExchangeRateData
+    {
+        public string Result { get; set; } = "";
+        public string Provider { get; set; } = "";
+        public string Documentation { get; set; } = "";
+        public string Terms_Of_Use { get; set; } = "";
+        public long Time_Last_Update_Unix { get; set; }
+        public string time_last_update_utc { get; set; } = "";
+        public long Time_Next_Update_Unix { get; set; }
+        public string Time_Next_Update_Utc { get; set; } = "";
+        public string base_code { get; set; } = "";
+        public Dictionary<string, decimal> rates { get; set; } = new();
+    }
+} 

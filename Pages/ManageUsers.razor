@@ -87,8 +87,12 @@
                                             <td>@user.Username</td>
                                             <td>@user.Role</td>
                                             <td>
-                                                <button class="btn btn-sm btn-warning me-2" @onclick="() => EditUser(user)" disabled="@(user.Username == currentUsername)">Edit</button>
-                                                <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteUser(user.Username)" disabled="@(user.Username == currentUsername)">Delete</button>
+                                                <button class="btn btn-sm btn-warning me-2" @onclick="() => EditUser(user)" disabled="@(user.Username == currentUsername)" title="Edit">
+                                                    <span class="oi oi-pencil"></span>
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteUser(user.Username)" disabled="@(user.Username == currentUsername)" title="Delete">
+                                                    <span class="oi oi-trash"></span>
+                                                </button>
                                             </td>
                                         </tr>
                                     }

@@ -11,23 +11,35 @@
         </a>
         <hr>
         <ul class="nav nav-pills flex-column mb-auto">
-            <li class="nav-item">
-                <NavLink class="nav-link text-white" href="" Match="NavLinkMatch.All">
-                    <span class="oi oi-home me-2"></span> Home
-                </NavLink>
-            </li>
-            <li>
-                <NavLink class="nav-link text-white" href="counter">
-                    <span class="oi oi-plus me-2"></span> Counter
-                </NavLink>
-            </li>
-            <li>
-                <NavLink class="nav-link text-white" href="weather">
-                    <span class="oi oi-list-rich me-2"></span> Weather
-                </NavLink>
-            </li>
             <AuthorizeView>
+                <NotAuthorized>
+                    <li class="nav-item">
+                        <NavLink class="nav-link text-white" href="" Match="NavLinkMatch.All">
+                            <span class="oi oi-home me-2"></span> Home
+                        </NavLink>
+                    </li>
+                </NotAuthorized>
                 <Authorized>
+                    <li>
+                        <NavLink class="nav-link text-white" href="dashboard">
+                            <span class="oi oi-dashboard me-2"></span> Dashboard
+                        </NavLink>
+                    </li>
+                    <li>
+                        <NavLink class="nav-link text-white" href="exchange-rates">
+                            <span class="oi oi-globe me-2"></span> Exchange Rates
+                        </NavLink>
+                    </li>
+                    <li>
+                        <NavLink class="nav-link text-white" href="github-analytics">
+                            <span class="oi oi-git me-2"></span> GitHub Analytics
+                        </NavLink>
+                    </li>
+                    <li>
+                        <NavLink class="nav-link text-white" href="code-quality-analytics">
+                            <span class="oi oi-graph me-2"></span> Code Quality Analytics
+                        </NavLink>
+                    </li>
                     <li>
                         <NavLink class="nav-link text-white" href="manage-users">
                             <span class="oi oi-people me-2"></span> Manage Users
@@ -41,9 +53,19 @@
     <main class="flex-grow-1">
         <div class="top-row px-4">
             <AuthorizeView>
-                <Authorized>
-                    <span>Hello, @context.User.Identity?.Name!</span>
-                    <button class="btn btn-outline-primary" @onclick="Logout">Logout</button>
+                <Authorized Context="authContext">
+                    <div class="dropdown">
+                        <button class="btn btn-light dropdown-toggle d-flex align-items-center" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="oi oi-person me-2"></span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li class="dropdown-item-text text-muted">
+                                <span class="oi oi-person me-2"></span>@authContext.User.Identity?.Name
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button class="dropdown-item" @onclick="Logout"><span class="oi oi-account-logout me-2"></span>Logout</button></li>
+                        </ul>
+                    </div>
                 </Authorized>
                 <NotAuthorized>
                     <a href="login" class="btn btn-primary">Login</a>

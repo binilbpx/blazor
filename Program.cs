@@ -10,10 +10,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<WeatherForecastService>();
+builder.Services.AddHttpClient();
 
 // Add authentication services
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
+
+// Add GitHub service
+builder.Services.AddScoped<IGitHubService, GitHubService>();
 
 var app = builder.Build();
 

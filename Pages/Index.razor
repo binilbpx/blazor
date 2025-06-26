@@ -1,89 +1,64 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.Components.Web
-@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Home - BalzorApp</PageTitle>
 
-<div class="container">
-    <h1>Welcome to BalzorApp</h1>
-    <p class="lead">A modern Blazor Server application with authentication</p>
-
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title">Getting Started</h5>
-                </div>
-                <div class="card-body">
-                    <p>Welcome to your new Blazor Server application!</p>
-                    <div class="d-flex gap-2">
-                        <span class="badge bg-success">Ready</span>
-                        <span class="badge bg-info">Blazor</span>
-                        <span class="badge bg-primary">.NET 8</span>
+<AuthorizeView>
+    <Authorized>
+        @{
+            Navigation.NavigateTo("/dashboard");
+        }
+    </Authorized>
+    <NotAuthorized>
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8 text-center">
+                    <h1 class="display-4 mb-4">Welcome to BalzorApp</h1>
+                    <p class="lead mb-5">A modern Blazor Server application with authentication and user management</p>
+                    
+                    <div class="row mb-5">
+                        <div class="col-md-4 text-center mb-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body">
+                                    <span class="oi oi-shield display-4 text-primary mb-3"></span>
+                                    <h5>Secure Authentication</h5>
+                                    <p class="text-muted">Built-in user authentication and authorization</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-center mb-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body">
+                                    <span class="oi oi-people display-4 text-success mb-3"></span>
+                                    <h5>User Management</h5>
+                                    <p class="text-muted">Comprehensive user administration system</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-center mb-4">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body">
+                                    <span class="oi oi-dashboard display-4 text-warning mb-3"></span>
+                                    <h5>Analytics Dashboard</h5>
+                                    <p class="text-muted">Real-time statistics and insights</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title">Navigation</h5>
-                </div>
-                <div class="card-body">
-                    <a href="/counter" class="btn btn-primary">Go to Counter</a>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title">Weather</h5>
-                </div>
-                <div class="card-body">
-                    <a href="/weather" class="btn btn-primary">View Weather</a>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title">Account</h5>
-                </div>
-                <div class="card-body">
-                    <a href="/login" class="btn btn-secondary">Login</a>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title">Features</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3 text-center">
-                            <i class="oi oi-shield" style="font-size: 2rem;"></i>
-                            <p class="mt-2">Authentication</p>
-                        </div>
-                        <div class="col-md-3 text-center">
-                            <i class="oi oi-palette" style="font-size: 2rem;"></i>
-                            <p class="mt-2">Modern UI</p>
-                        </div>
-                        <div class="col-md-3 text-center">
-                            <i class="oi oi-monitor" style="font-size: 2rem;"></i>
-                            <p class="mt-2">Responsive</p>
-                        </div>
-                        <div class="col-md-3 text-center">
-                            <i class="oi oi-rocket" style="font-size: 2rem;"></i>
-                            <p class="mt-2">Fast</p>
+
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body p-5">
+                            <h4 class="mb-4">Get Started</h4>
+                            <p class="text-muted mb-4">Sign in to access the full application features and dashboard.</p>
+                            <a href="/login" class="btn btn-primary btn-lg">
+                                <span class="oi oi-account-login me-2"></span>Sign In
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
+    </NotAuthorized>
+</AuthorizeView>

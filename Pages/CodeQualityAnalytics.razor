@@ -1,0 +1,618 @@
+@page "/code-quality-analytics"
+@using Microsoft.AspNetCore.Components.Authorization
+@using BalzorApp.Services
+@using BalzorApp.Models
+@inject IGitHubService GitHubService
+@inject ILogger<CodeQualityAnalytics> Logger
+@inject NavigationManager Navigation
+
+<PageTitle>Code Quality Analytics - BalzorApp</PageTitle>
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0 text-dark">
+                        <span class="oi oi-graph me-2"></span>Code Quality Analytics
+                    </h1>
+                    <p class="text-muted">Advanced analysis of code quality based on PR comments and reviews</p>
+                </div>
+                <div class="d-flex gap-2">
+                    @if (isGitHubConnected)
+                    {
+                        <span class="badge bg-success d-flex align-items-center">
+                            <span class="oi oi-check me-1"></span>GitHub Connected
+                        </span>
+                        <button class="btn btn-outline-danger btn-sm" @onclick="DisconnectGitHub">
+                            <span class="oi oi-account-logout me-1"></span>Disconnect
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-primary btn-sm" @onclick="ConnectGitHub">
+                            <span class="oi oi-git me-1"></span>Connect GitHub
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GitHub Connection -->
+    @if (!isGitHubConnected)
+    {
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <div class="mb-4">
+                            <span class="oi oi-git" style="font-size: 4rem; color: #333;"></span>
+                        </div>
+                        <h4>Connect to GitHub for Advanced Analytics</h4>
+                        <p class="text-muted mb-4">Get detailed code quality insights from your pull requests, comments, and reviews</p>
+                        <button class="btn btn-primary btn-lg" @onclick="ConnectGitHub">
+                            <span class="oi oi-git me-2"></span>Connect GitHub Account
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Analysis Input -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="row align-items-end">
+                            <div class="col-md-6">
+                                <label class="form-label">GitHub Username or Organization</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <span class="oi oi-person"></span>
+                                    </span>
+                                    <select class="form-select" @bind="selectedUserOrg">
+                                        <option value="">Select a user or organization...</option>
+                                        @foreach (var userOrg in availableUsersOrgs)
+                                        {
+                                            <option value="@userOrg">@userOrg</option>
+                                        }
+                                    </select>
+                                    <button class="btn btn-outline-secondary" @onclick="RefreshUsersOrgs" title="Refresh users and organizations">
+                                        <span class="oi oi-reload"></span>
+                                    </button>
+                                    <button class="btn btn-primary" @onclick="AnalyzeCodeQuality" disabled="@(string.IsNullOrWhiteSpace(selectedUserOrg) || isLoading)">
+                                        @if (isLoading)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            <span>Analyzing...</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="oi oi-graph me-2"></span>
+                                            <span>Analyze Quality</span>
+                                        }
+                                    </button>
+                                </div>
+                                @if (availableUsersOrgs.Any())
+                                {
+                                    <small class="text-muted">Found @availableUsersOrgs.Count users/organizations from your repositories</small>
+                                }
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" @bind="includePrivateRepos" id="includePrivate">
+                                    <label class="form-check-label" for="includePrivate">
+                                        Include private repositories
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Analyzing code quality metrics...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (errorMessage != null)
+        {
+            <div class="row">
+                <div class="col-12">
+                    <div class="alert alert-danger" role="alert">
+                        <span class="oi oi-warning me-2"></span>
+                        @errorMessage
+                        <button class="btn btn-sm btn-outline-danger ms-3" @onclick="AnalyzeCodeQuality">
+                            <span class="oi oi-reload me-1"></span>Retry
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+        else if (codeQualityMetrics != null)
+        {
+            <!-- Quality Score Overview -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-gradient-primary text-white">
+                            <h5 class="mb-0">
+                                <span class="oi oi-star me-2"></span>Code Quality Overview - @codeQualityMetrics.User
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 mb-3">
+                                    <div class="text-center p-4 bg-light rounded">
+                                        <div class="quality-score-circle mb-3">
+                                            <div class="score-value">@((codeQualityMetrics.ApprovalRate * 100).ToString("F0"))%</div>
+                                        </div>
+                                        <h6 class="text-primary">Approval Rate</h6>
+                                        <small class="text-muted">@codeQualityMetrics.ApprovedReviews approved / @codeQualityMetrics.TotalReviews total</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="text-center p-4 bg-light rounded">
+                                        <div class="quality-score-circle mb-3">
+                                            <div class="score-value">@((codeQualityMetrics.MergeRate * 100).ToString("F0"))%</div>
+                                        </div>
+                                        <h6 class="text-success">Merge Rate</h6>
+                                        <small class="text-muted">@codeQualityMetrics.MergedPRs merged / @codeQualityMetrics.TotalPRs total</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="text-center p-4 bg-light rounded">
+                                        <div class="quality-score-circle mb-3">
+                                            <div class="score-value">@codeQualityMetrics.AverageComments.ToString("F1")</div>
+                                        </div>
+                                        <h6 class="text-info">Avg Comments</h6>
+                                        <small class="text-muted">Per pull request</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <div class="text-center p-4 bg-light rounded">
+                                        <div class="quality-score-circle mb-3">
+                                            <div class="score-value">@codeQualityMetrics.AveragePRSize.ToString("F1")</div>
+                                        </div>
+                                        <h6 class="text-warning">Avg PR Size</h6>
+                                        <small class="text-muted">Files changed</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row mb-4">
+                <!-- PR Status Chart -->
+                <div class="col-md-6 mb-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0">
+                                <span class="oi oi-git-branch me-2"></span>Pull Request Status
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container" style="position: relative; height: 300px;">
+                                <div class="d-flex align-items-center justify-content-center h-100">
+                                    <div class="text-center">
+                                        <div class="pr-status-chart">
+                                            <div class="pr-status-item">
+                                                <div class="pr-status-circle bg-success">
+                                                    <span class="pr-status-number">@codeQualityMetrics.MergedPRs</span>
+                                                </div>
+                                                <div class="pr-status-label">Merged</div>
+                                            </div>
+                                            <div class="pr-status-item">
+                                                <div class="pr-status-circle bg-warning">
+                                                    <span class="pr-status-number">@codeQualityMetrics.OpenPRs</span>
+                                                </div>
+                                                <div class="pr-status-label">Open</div>
+                                            </div>
+                                            <div class="pr-status-item">
+                                                <div class="pr-status-circle bg-danger">
+                                                    <span class="pr-status-number">@codeQualityMetrics.ClosedPRs</span>
+                                                </div>
+                                                <div class="pr-status-label">Closed</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Review Types Chart -->
+                <div class="col-md-6 mb-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0">
+                                <span class="oi oi-check me-2"></span>Review Types Distribution
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container" style="position: relative; height: 300px;">
+                                <div class="d-flex align-items-center justify-content-center h-100">
+                                    <div class="review-types-chart">
+                                        <div class="review-type-item">
+                                            <div class="review-type-bar bg-success" style="height: @(codeQualityMetrics.ApprovedReviews * 10)px;"></div>
+                                            <div class="review-type-label">Approved</div>
+                                            <div class="review-type-count">@codeQualityMetrics.ApprovedReviews</div>
+                                        </div>
+                                        <div class="review-type-item">
+                                            <div class="review-type-bar bg-warning" style="height: @(codeQualityMetrics.ChangesRequestedReviews * 10)px;"></div>
+                                            <div class="review-type-label">Changes Requested</div>
+                                            <div class="review-type-count">@codeQualityMetrics.ChangesRequestedReviews</div>
+                                        </div>
+                                        <div class="review-type-item">
+                                            <div class="review-type-bar bg-info" style="height: @(codeQualityMetrics.CommentedReviews * 10)px;"></div>
+                                            <div class="review-type-label">Commented</div>
+                                            <div class="review-type-count">@codeQualityMetrics.CommentedReviews</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comment Analysis -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0">
+                                <span class="oi oi-chat me-2"></span>Comment Analysis
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                @foreach (var category in codeQualityMetrics.CommentCategories.OrderByDescending(x => x.Value))
+                                {
+                                    <div class="col-md-4 mb-3">
+                                        <div class="d-flex align-items-center p-3 bg-light rounded">
+                                            <div class="flex-shrink-0 me-3">
+                                                <div class="category-icon">
+                                                    @GetCategoryIcon(category.Key)
+                                                </div>
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <h6 class="mb-1">@category.Key</h6>
+                                                <p class="mb-0 text-primary">@category.Value comments</p>
+                                                <small class="text-muted">@((double)category.Value / codeQualityMetrics.TotalComments * 100).ToString("F1")% of total</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent PR Timeline -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-dark text-white">
+                            <h6 class="mb-0">
+                                <span class="oi oi-timeline me-2"></span>Recent Pull Requests Quality Timeline
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>PR #</th>
+                                            <th>Title</th>
+                                            <th>Status</th>
+                                            <th>Quality Score</th>
+                                            <th>Comments</th>
+                                            <th>Review Comments</th>
+                                            <th>Created</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var pr in codeQualityMetrics.RecentPRs)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <span class="badge bg-secondary">#@pr.Number</span>
+                                                </td>
+                                                <td>
+                                                    <div class="text-truncate" style="max-width: 300px;" title="@pr.Title">
+                                                        @pr.Title
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    @if (pr.State == "open")
+                                                    {
+                                                        <span class="badge bg-warning">Open</span>
+                                                    }
+                                                    else if (pr.MergedAt != null)
+                                                    {
+                                                        <span class="badge bg-success">Merged</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-danger">Closed</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    <div class="quality-indicator">
+                                                        <div class="quality-bar" style="width: @(pr.QualityScore)%"></div>
+                                                        <span class="quality-text">@pr.QualityScore.ToString("F0")</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-info">@pr.Comments</span>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-primary">@pr.ReviewComments</span>
+                                                </td>
+                                                <td>
+                                                    <small class="text-muted">@pr.CreatedAt.ToString("MMM dd")</small>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .bg-gradient-primary {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    }
+
+    .quality-score-circle {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    }
+
+    .score-value {
+        color: white;
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+
+    .category-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+    }
+
+    .quality-indicator {
+        position: relative;
+        width: 100px;
+        height: 20px;
+        background: #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .quality-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
+        transition: width 0.3s ease;
+    }
+
+    .quality-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 0.75rem;
+        font-weight: bold;
+        color: #333;
+        text-shadow: 0 0 2px white;
+    }
+
+    .pr-status-chart {
+        display: flex;
+        gap: 2rem;
+        align-items: center;
+    }
+
+    .pr-status-item {
+        text-align: center;
+    }
+
+    .pr-status-circle {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 0.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .pr-status-number {
+        color: white;
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+
+    .pr-status-label {
+        font-weight: 500;
+        color: #666;
+    }
+
+    .review-types-chart {
+        display: flex;
+        gap: 2rem;
+        align-items: end;
+        height: 200px;
+    }
+
+    .review-type-item {
+        text-align: center;
+        flex: 1;
+    }
+
+    .review-type-bar {
+        width: 60px;
+        margin: 0 auto 0.5rem;
+        border-radius: 4px 4px 0 0;
+        transition: height 0.3s ease;
+    }
+
+    .review-type-label {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: #666;
+        margin-bottom: 0.25rem;
+    }
+
+    .review-type-count {
+        font-weight: bold;
+        color: #333;
+    }
+</style>
+
+@code {
+    private string selectedUserOrg = "";
+    private bool isLoading = false;
+    private string? errorMessage;
+    private bool includePrivateRepos = false;
+    private CodeQualityMetrics? codeQualityMetrics;
+    private bool isGitHubConnected = false;
+    private List<string> availableUsersOrgs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isGitHubConnected = GitHubService.IsAuthenticated();
+        if (isGitHubConnected)
+        {
+            availableUsersOrgs = await GitHubService.GetAvailableUsersOrgsAsync();
+        }
+    }
+
+    private async Task ConnectGitHub()
+    {
+        try
+        {
+            var authUrl = await GitHubService.GetAuthorizationUrlAsync();
+            // Redirect to GitHub OAuth
+            Navigation.NavigateTo(authUrl);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error connecting to GitHub");
+            errorMessage = "Failed to connect to GitHub. Please check your configuration.";
+        }
+    }
+
+    private async Task DisconnectGitHub()
+    {
+        GitHubService.Logout();
+        codeQualityMetrics = null;
+        isGitHubConnected = false;
+        availableUsersOrgs.Clear();
+        selectedUserOrg = "";
+    }
+
+    private async Task AnalyzeCodeQuality()
+    {
+        if (string.IsNullOrWhiteSpace(selectedUserOrg))
+            return;
+
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            // Get user data
+            var userData = await GitHubService.GetUserDataAsync(selectedUserOrg);
+            if (userData == null)
+            {
+                errorMessage = "User not found. Please check the username.";
+                return;
+            }
+
+            // Get repositories
+            var repositories = await GitHubService.GetRepositoriesAsync(selectedUserOrg, includePrivateRepos);
+            if (!repositories.Any())
+            {
+                errorMessage = "No repositories found for this user.";
+                return;
+            }
+
+            // Analyze code quality
+            codeQualityMetrics = await GitHubService.AnalyzeCodeQualityAsync(selectedUserOrg, repositories);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error analyzing code quality");
+            errorMessage = "An error occurred while analyzing code quality. Please try again.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string GetCategoryIcon(string category)
+    {
+        return category switch
+        {
+            "Bug Reports" => "🐛",
+            "Testing" => "🧪",
+            "Code Style" => "🎨",
+            "Security" => "🔒",
+            "Performance" => "⚡",
+            "Documentation" => "📚",
+            "Refactoring" => "🔧",
+            "Positive Feedback" => "👍",
+            "Error Handling" => "⚠️",
+            _ => "��"
+        };
+    }
+
+    private async Task RefreshUsersOrgs()
+    {
+        availableUsersOrgs = await GitHubService.GetAvailableUsersOrgsAsync();
+    }
+}
